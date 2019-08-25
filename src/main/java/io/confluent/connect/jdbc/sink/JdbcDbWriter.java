@@ -18,6 +18,7 @@ package io.confluent.connect.jdbc.sink;
 import org.apache.kafka.connect.errors.ConnectException;
 import org.apache.kafka.connect.sink.SinkRecord;
 
+import java.lang.reflect.InvocationTargetException;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.Collection;
@@ -57,7 +58,7 @@ public class JdbcDbWriter {
 
     final Map<TableId, BufferedRecords> bufferByTable = new HashMap<>();
     for (SinkRecord record : records) {
-      final TableId tableId = destinationTable(record.topic());
+      final TableId tableId = destinationTable(record);
       BufferedRecords buffer = bufferByTable.get(tableId);
       if (buffer == null) {
         buffer = new BufferedRecords(config, tableId, dbDialect, dbStructure, connection);
@@ -79,12 +80,47 @@ public class JdbcDbWriter {
     cachedConnectionProvider.close();
   }
 
-  TableId destinationTable(String topic) {
-    final String tableName = config.tableNameFormat.replace("${topic}", topic);
+  TableNameFormatter newTableNameCustomFormatter(String className) {
+    TableNameFormatter tableNameFormatter;
+    final Class<?> tableNameCustomFormatterClass;
+    try {
+      tableNameCustomFormatterClass = Class.forName(className);
+    } catch (ClassNotFoundException e) {
+      throw new ConnectException(String.format(
+          "Unable to find class: %s",
+          className
+      ));
+    }
+
+    if (!TableNameFormatter.class.isAssignableFrom(tableNameCustomFormatterClass)) {
+      throw new ConnectException(String.format(
+          "%s does not implement TableNameFormatter interface"
+      ));
+    }
+
+    try {
+      tableNameFormatter = (TableNameFormatter) tableNameCustomFormatterClass
+          .getDeclaredConstructor().newInstance();
+    } catch (IllegalAccessException | InstantiationException
+        | NoSuchMethodException | InvocationTargetException e) {
+      throw new ConnectException(String.format(
+          "Unable to instantiate custom table formatter due to: %s",
+          e.getMessage()
+      ));
+    }
+
+    return tableNameFormatter;
+  }
+
+  TableId destinationTable(SinkRecord record) {
+    final String tableName = config.tableNameCustomFormatter.isEmpty()
+        ? config.tableNameFormat.replace("${topic}", record.topic()) :
+        newTableNameCustomFormatter(config.tableNameCustomFormatter)
+            .destinationTableName(record);
     if (tableName.isEmpty()) {
       throw new ConnectException(String.format(
-          "Destination table name for topic '%s' is empty using the format string '%s'",
-          topic,
+          "Destination table name for topic '%s' is empty",
+          record.topic(),
           config.tableNameFormat
       ));
     }

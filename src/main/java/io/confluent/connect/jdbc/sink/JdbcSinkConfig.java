@@ -83,6 +83,14 @@ public class JdbcSinkConfig extends AbstractConfig {
       + "'kafka_orders'.";
   private static final String TABLE_NAME_FORMAT_DISPLAY = "Table Name Format";
 
+  public static final String TABLE_NAME_CUSTOM_FORMATTER = "table.name.custom.formatter";
+  private static final String TABLE_NAME_CUSTOM_FORMATTER_DEFAULT = "";
+  private static final String TABLE_NAME_CUSTOM_FORMATTER_DOC =
+      "Classname that implements io.confluent.connect.jdbc.sink.TableNameFormatter interface."
+      + "If this is defined, table.name.format will be ignored and this class will be used to "
+      + "determine the destination table name.";
+  private static final String TABLE_NAME_CUSTOM_FORMATTER_DISPLAY = "Table Name Custom Formatter";
+
   public static final String MAX_RETRIES = "max.retries";
   private static final int MAX_RETRIES_DEFAULT = 10;
   private static final String MAX_RETRIES_DOC =
@@ -338,6 +346,17 @@ public class JdbcSinkConfig extends AbstractConfig {
           ConfigDef.Width.MEDIUM,
           DB_TIMEZONE_CONFIG_DISPLAY
         )
+        .define(
+            TABLE_NAME_CUSTOM_FORMATTER,
+            ConfigDef.Type.STRING,
+            TABLE_NAME_CUSTOM_FORMATTER_DEFAULT,
+            ConfigDef.Importance.LOW,
+            TABLE_NAME_CUSTOM_FORMATTER_DOC,
+            DATAMAPPING_GROUP,
+            6,
+            ConfigDef.Width.LONG,
+            TABLE_NAME_CUSTOM_FORMATTER_DISPLAY
+        )
         // DDL
         .define(
             AUTO_CREATE,
@@ -400,6 +419,7 @@ public class JdbcSinkConfig extends AbstractConfig {
   public final String connectionUser;
   public final String connectionPassword;
   public final String tableNameFormat;
+  public final String tableNameCustomFormatter;
   public final int batchSize;
   public final int maxRetries;
   public final int retryBackoffMs;
@@ -418,6 +438,7 @@ public class JdbcSinkConfig extends AbstractConfig {
     connectionUser = getString(CONNECTION_USER);
     connectionPassword = getPasswordValue(CONNECTION_PASSWORD);
     tableNameFormat = getString(TABLE_NAME_FORMAT).trim();
+    tableNameCustomFormatter = getString(TABLE_NAME_CUSTOM_FORMATTER).trim();
     batchSize = getInt(BATCH_SIZE);
     maxRetries = getInt(MAX_RETRIES);
     retryBackoffMs = getInt(RETRY_BACKOFF_MS);
